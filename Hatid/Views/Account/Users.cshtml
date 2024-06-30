@@ -1,0 +1,241 @@
+﻿@model List<Hatid.Data.Models.User>
+@{
+    ViewData["Title"] = "Users";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var roles = Hatid.Helpers.EnumToDataList<Hatid.EnumRole>();
+}
+<div id="divUsers" v-cloak>
+    <div class="row">
+        <div class="col-12">
+            <div class="card content-bg">
+                <div class="card-header">
+                    <div class="row">
+                        <div class="col-12 col-lg-2 float-start">
+                            <div class="form-floating">
+                                <input id="txtSearchUser" name="txtSearchUser" class="form-control search" placeholder="Search..." v-model="filter">
+                                <label for="txtSearchUser">Search</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-auto ms-auto mt-2">
+                            <a class="btn btn-sm btn-primary float-right" href="#" @@click="getUserByUserId(0)" title="Add"><i class="fa fa-plus"></i></a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <b-table striped hover :items="users" :fields="fields" table-variant="secondary" head-variant="dark" :filter-included-fields="['firstName','lastName','email','phoneNumber']" :filter="filter">
+                                <template #cell(lastLoginDate)="data">
+                                    <span>{{ data.value |format-date-time }}</span>
+                                </template>
+                                <template #cell(roleId)="data">
+                                    <span v-show="data.value==1">Admin</span>
+                                    <span v-show="data.value==2">Manager</span>
+                                    <span v-show="data.value==3">Sales</span>
+                                </template>
+                                <template #cell(isActive)="data">
+                                    <span><i :class="data.value ? 'fa-lg fas fa-check-circle text-success' : 'fa-lg fas fa-times-circle text-danger'"></i></span>
+                                </template>
+                                <template #cell(actions)="data">
+                                    <button class="btn btn-sm btn-danger" @@click="deleteUser(data.item.id)" title="Delete"><i class="fa fa-trash me-0"></i></button>
+                                    <button class="btn btn-sm btn-info" @@click="getUserByUserId(data.item.id)" title="Edit"><i class="fa fa-edit"></i></button>
+                                </template>
+                            </b-table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @*Modals*@
+        <div class="modal fade" id="modalUser" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog ">
+                <div class="modal-content" v-if="editUser">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ editUser.id === 0 ? 'Add' : 'Edit' }} User</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="frmUser" v-form-validation>
+                            <div class="row">
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <input id="txtFirstName" name="txtFirstName" type="text" class="form-control" placeholder="First Name" v-model="editUser.firstName" required data-msg-required="The First Name is required."/>
+                                        <label class="label" for="txtFirstName">First Name</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <input id="txtLastName" name="txtLastName" type="text" class="form-control" placeholder="Last Name" v-model="editUser.lastName" required data-msg-required="The Last Name is required."/>
+                                        <label for="txtLastName">Last Name</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <input id="txtMobilePhone" name="txtMobilePhone" type="text" class="form-control" placeholder="Mobile Number" v-model="editUser.phoneNumber" required data-msg-required="The Phone Number is required." validate-integer remote-validation="validatePhoneNumberAlreadyExists" data-msg-remote-validation="The Phone Number is already in use." valid-integer/>
+                                        <label for="txtMobilePhone">Phone Number</label>
+                                    </div>
+                                </div>
+                                <template v-if="editUser.id == 0">
+                                    <div class="col-6 col-md-5">
+                                        <div class="form-floating mb-3">
+                                            <div class="form-check form-switch mt-3">
+                                                <input class="form-check-input" type="checkbox" id="chkEmailInvite" v-model="editUser.isSendEmailInvite" />
+                                                <label class="form-check-label" for="chkEmailInvite">Send Email Invite</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-7" v-if="!editUser.isSendEmailInvite">
+                                        <div class="form-floating mb-3">
+                                            <div class="form-floating mb-3">
+                                                <input id="txtPassword" name="txtPassword" type="password" class="form-control" placeholder="Password" v-model="editUser.password" required data-msg-required="The Password is required." valid-password />
+                                                <label for="txtPassword">Password</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <input id="txtEmail" name="txtEmail" type="text" class="form-control" placeholder="Email" v-model="editUser.email" valid-email required data-msg-required="The Email is required." remote-validation="validateEmailAlreadyExists" data-msg-remote-validation="The Email is already in use." />
+                                        <label for="txtEmail">Email</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <select id="selectRole" name="selectRole" class="form-select" v-model="editUser.roleId" select-required="The Role is required.">
+                                            <option value="0">-- Select Role --</option>
+                                            <option :value="r.key" v-for="r in roles">{{ r.value }}</option>
+                                        </select>
+                                        <label for="selectRole">Role</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <div class="form-check form-switch" v-if="editUser.id">
+                                            <input class="form-check-input" type="checkbox" id="chkActive" v-model="editUser.isActive"/>
+                                            <label class="form-check-label" for="chkActive">Active</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" @@click="saveUser()">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+
+    <script>
+        Vue.config.devtools = true;
+        if (vueUser != null) {
+            vueUser.$destroy();
+        }
+
+        var vueUser = new Vue({
+            el: '#divUsers',
+            data: {
+                users: @Html.Raw(Json.Serialize(Model)),
+                roles: @Html.Raw(Json.Serialize(roles)),
+                editUser: null,
+                filter: '',
+                fields: [
+                    {
+                        key: 'firstName',
+                        label: 'First Name',
+                        sortable: true,
+                    },
+                    {
+                        key: 'lastName',
+                        label: 'Last Name',
+                        sortable: true,
+                    },
+                    {
+                        key: 'email',
+                        label: 'Email',
+                        sortable: true,
+                    },
+                    {
+                        key: 'roleId',
+                        label: 'Role',
+                        sortable: true,
+                    },
+                    {
+                        key: 'phoneNumber',
+                        label: 'Mobile Phone',
+                        sortable: true,
+
+                    },
+                    {
+                        key: 'lastLoginDate',
+                        label: 'Last Login Date & Time',
+                        sortable: true,
+                    },
+                    {
+                        key: 'isActive',
+                        label: 'Active',
+                        sortable: true,
+                    },
+                    {
+                        key: 'actions',
+                        label: 'Actions',
+                    }
+                ],
+                filterData: {
+                    filter: true,
+                },
+
+            },
+            methods: {
+                getUserByUserId(userId) {
+                    $.post('/Account/GetUserByUserId', postData({ userId: userId }), (data, status, response) => {
+                        if (response.status === 200) {
+                            this.editUser = data;
+                            showModal('#modalUser');
+                        }
+                    });
+                },
+                saveUser() {
+                    if ($('#frmUser').valid()) {
+                        $.post('/Account/saveUser', postData({ user: this.editUser }), (data, status, response) => {
+                            if (response.status === 200) {
+                                let index = this.users.findIndex(x => x.id === this.editUser.id);
+                                if (index > -1) {
+                                    Vue.set(this.users, this.users.findIndex(x => x.id === this.editUser.id), data);
+                                } else {
+                                    this.users.push(data);
+                                }
+                                hideModal('#modalUser');
+                                notifySuccess("User saved successfully!");
+                            }
+                        });
+                    }
+                },
+                deleteUser(userId) {
+                    confirmBox("You want to delete this User", () => {
+                        $.post('/Account/DeleteUser', postData({ userId: userId }), (data, status, response) => {
+                            if (response.status === 200) {
+                                this.users.splice(this.users.indexOf(userId), 1);
+                                this.editUser = null;
+                                notifySuccess("User deleted successfully!");
+                            }
+                        });
+                    });
+                },
+            },
+            computed: {
+               
+            },
+            mounted() {
+               
+            },
+        });
+
+    </script>
+}

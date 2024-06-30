@@ -1,0 +1,264 @@
+﻿@model List<Hatid.Data.Models.User>
+@{
+    ViewData["Title"] = "Shifts";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var dateFilterTypes = Hatid.Helpers.EnumToDataList<Hatid.EnumtDateFilter>();
+}
+<div id="divAdminShifts" v-cloak>
+    <div class="row">
+        <div class="col-12">
+            <div class="card content-bg">
+                <div class="card-header">
+                    <div class="row">
+                        <div class="col-md-2 col-12">
+                            <div class="form-floating mb-3">
+                                <select id="selectDateFilter" class="form-select" v-model="dateFilterId" @@change="shiftFilterChange">
+                                    <option :value="d.key" v-for="d in dateFilterTypes">{{d.value}}</option>
+                                </select>
+                                <label for="selectDateFilter">Date Range</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6" v-if="dateFilterId === 3">
+                            <div class="form-floating mb-3">
+                                <input type="date" id="dateFromCustom" name="dateFromCustom" class="form-control" v-on:blur="filterDateChange" v-model="startDate">
+                                <label for="txtFromdate" class="form-label">From</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6" v-if="dateFilterId === 3">
+                            <div class="form-floating mb-3">
+                                <input type="date" id="dateToCustom" name="dateToCustom" class="form-control" v-on:blur="filterDateChange" v-model="endDate">
+                                <label for="dateToFor" class="form-label">To</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-2 float-start">
+                            @*  <label class="form-label mb-0 text-secondary">Sale Persons</label>
+                            <multiple-select id="ddlUsers" multiple v-model="selectedUserIds" style="width: 100% !important" :data="userList" placeholder="Select Sale Person" :options="filterData"></multiple-select> *@
+                            <div class="form-floating mb-3">
+                                <select id="selectUser" name="selectUser" class="form-select" v-model="selectedUserId">
+                                    <option value="0" selected>-- Select User --</option>
+                                    <option :value="u.id" v-for="u in users">{{ u.firstName+' '+u.lastName }}</option>
+                                </select>
+                                <label for="selectSalePersons">Users</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <b-table striped hover :items="filteredShifts" :fields="fields" table-variant="secondary" head-variant="dark">
+                                <template #cell(dateTime)="data">
+                                    <span>{{ data.value |format-date-time }}</span>
+                                </template>
+                                <template #cell(actions)="data">
+                                    <button class="btn btn-sm btn-danger" @@click="deleteShift(data.item.id)" title="Delete"><i class="fa fa-trash me-0"></i></button>
+                                    <button class="btn btn-sm btn-info" @@click="editShiftData(data.item)" title="Edit"><i class="fa fa-edit"></i></button>
+                                </template>
+                            </b-table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+           @*Modals*@
+        <div class="modal fade" id="modalShift" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog ">
+                <div class="modal-content" v-if="editShift">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Shift</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="col-md-12 col-12">
+                            <div class="form-floating mb-3">
+                                <input type="date" id="shiftDate" name="shiftDate" class="form-control" v-model="editShift.dateTime">
+                                <label for="shiftDate" class="form-label">Date</label>
+                            </div>
+                        </div>
+                        <div class="col-md-12 col-12">
+                            <div class="form-floating mb-3">
+                                <input type="time" id="shiftTime" name="shiftTime" class="form-control" v-model="shiftTime">
+                                <label for="shiftTime" class="form-label">Time</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" @@click="saveShift()">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+
+    <script>
+        Vue.config.devtools = true;
+        if (vueAdminShift != null) {
+            vueAdminShift.$destroy();
+        }
+
+        var vueAdminShift = new Vue({
+            el: '#divAdminShifts',
+            data: {
+                shifts: [],
+                users: @Html.Raw(Json.Serialize(Model)),
+                startDate: moment().startOf('month').format('YYYY-MM-DD'),
+                endDate: moment().endOf('month').format('YYYY-MM-DD'),
+                dateFilterTypes: @Html.Raw(Json.Serialize(dateFilterTypes)),
+                dateFilterId: 1,
+                selectedUserId: 0,
+                fields: [
+                    {
+                        key: 'userName',
+                        label: 'Name',
+                        sortable: true,
+                    },
+                    {
+                        key: 'timeIn',
+                        label: 'Time In',
+                        sortable: true,
+                    },
+                    {
+                        key: 'timeOut',
+                        label: 'Time Out',
+                        sortable: true,
+                    },
+                    {
+                        key: 'hour',
+                        label: 'Hour',
+                        sortable: true,
+                    },
+                    {
+                        key: 'minute',
+                        label: 'Minute',
+                        sortable: true,
+                    },
+                    {
+                        key: 'second',
+                        label: 'Second',
+                        sortable: true,
+                    },
+                ],
+                filterData: {
+                    filter: true,
+                },
+                editShift:null,
+                shiftTime:'',
+
+            },
+            methods: {
+                selectDefaultFirst() {
+                    if (this.users.length > 0) this.selectedUser(this.users[0]);
+                },
+                selectedUser(u) {
+                    this.selectedUserId = u.id;
+                },
+                editShiftData(data) {
+                    this.editShift = { ...data };
+                    this.editShift.dateTime = moment(data.dateTime).format('YYYY-MM-DD');
+                    this.shiftTime=this.setTime(data.hour, data.minute, data.second);
+                    showModal('#modalShift');
+                },
+                saveShift() {
+                    this.editShift.dateTime = moment(`${this.editShift.dateTime} ${this.shiftTime}`, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD HH:mm:ss');
+                    $.post('/Admin/SaveShift', postData({ shift: this.editShift }), (data, status, response) => {
+                        if (response.status === 200) {
+                            let index = this.shifts.findIndex(x => x.id === this.editShift.id);
+                            if (index > -1) {
+                                Vue.set(this.shifts, this.shifts.findIndex(x => x.id === this.editShift.id), data);
+                            } else {
+                                this.shifts.push(data);
+                            }
+                            this.editShift = null;
+                            this.shiftTime = '';
+                            hideModal('#modalShift');
+                            notifySuccess("Shift saved successfully!");
+                        }
+                    });
+                },
+                deleteShift(shiftId) {
+                    confirmBox("You want to delete this Shift", () => {
+                        $.post('/Admin/DeleteShift', postData({ shiftId: shiftId }), (data, status, response) => {
+                            if (response.status === 200) {
+                                let index = this.shifts.findIndex(x => x.id === shiftId);
+                                if (index > -1) {
+                                    this.shifts.splice(index, 1);
+                                }
+                                this.editShift = null;
+                                notifySuccess("Shift deleted successfully!");
+                            }
+                        });
+                    });
+                },
+                getShifts() {
+                    if (!moment(this.startDate).isValid() || !moment(this.endDate).isValid()) return;
+                    $.post('/Admin/GetShifts', postData({ startDate: this.startDate, endDate: this.endDate }), (data, status, response) => {
+                        if (response.status === 200) {
+                            this.shifts = data;
+                        }
+                    });
+                },
+                shiftFilterChange() {
+
+                    switch (this.dateFilterId) {
+                        case 1:
+                            this.startDate = moment().startOf('month').format('YYYY-MM-DD');
+                            this.endDate = moment().endOf('month').format('YYYY-MM-DD');
+                            break;
+                        case 2:
+                            this.startDate = moment().subtract(1, 'month').startOf('month').format('YYYY-MM-DD');
+                            this.endDate = moment().subtract(1, 'month').endOf('month').format('YYYY-MM-DD');
+                            break;
+                        case 3:
+                            this.startDate = this.startDate;
+                            this.endDate = this.endDate;
+                            break;
+                        default:
+                            this.startDate = null;
+                            this.endDate = null;
+                            return;
+                    }
+
+                    this.getShifts();
+                },
+                filterDateChange() {
+                    this.getShifts();
+                },
+                setTime(hours, minutes, seconds) {
+                    const time = moment().startOf('day').add(hours, 'hours').add(minutes, 'minutes').add(seconds, 'seconds');
+                    return time.format('HH:mm');
+                },
+            },
+            computed: {
+                userList() {
+                    var ret = this.users.sort((a, b) => {
+                        return (a.id > 0 ? ((a.Sort > b.Sort) ? 1 : ((b.Sort > a.Sort) ? -1 : 0)) : 0);
+                    });
+                    return ret.map((x) => {
+                        return { value: x.id, text: x.firstName + ' ' + x.lastName };
+                    });
+                },
+                filteredShifts() {
+                    var ret = this.shifts;
+                  
+                    if (this.selectedUserId > 0) {
+                        ret = ret.filter(x => x.createdById == this.selectedUserId);
+                    }
+
+                    return ret;
+                },
+                
+            },
+            mounted() {
+                this.selectDefaultFirst();
+                this.getShifts();
+            },
+        });
+
+    </script>
+}

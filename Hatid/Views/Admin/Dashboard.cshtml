@@ -1,0 +1,527 @@
+﻿@model List<Hatid.Data.Models.User>
+@{
+    ViewData["Title"] = "Deposits";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var dateFilterTypes = Hatid.Helpers.EnumToDataList<Hatid.EnumtDateFilter>();
+}
+<div id="divAdminDeposits" v-cloak>
+    <div class="row">
+        <div class="col-12">
+            <div class="card content-bg">
+                <div class="card-header">
+                   <div class="row">
+                        <div class="col-md-2 col-12">
+                            <div class="form-floating mb-3">
+                                <select id="selectDateFilter" class="form-select" v-model="dateFilterId" @@change="depositFilterChange">
+                                    <option :value="d.key" v-for="d in dateFilterTypes">{{d.value}}</option>
+                                </select>
+                                <label for="selectDateFilter">Date Range</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6" v-if="dateFilterId === 3">
+                            <div class="form-floating mb-3">
+                                <input type="date" id="dateFromCustom" name="dateFromCustom" class="form-control" v-on:blur="filterDateChange" v-model="startDate">
+                                <label for="txtFromdate" class="form-label">From</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6" v-if="dateFilterId === 3">
+                            <div class="form-floating mb-3">
+                                <input type="date" id="dateToCustom" name="dateToCustom" class="form-control" v-on:blur="filterDateChange" v-model="endDate">
+                                <label for="dateToFor" class="form-label">To</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-auto ms-auto mt-2">
+                            <button class="btn btn-primary float-right me-3" title="Add Deposit" @@click="addDepositData">Add Deposit</button>
+                            <button class="btn btn-primary float-right" title="Add Shift" @@click="addShiftData">Add Shift</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <b-table striped hover :items="shiftdeposits" :fields="fields" table-variant="secondary" head-variant="dark">
+                                <template #cell(depositAmount)="data">
+                                    <a href="#" @@click="showDepositModal(data.item.userId)"><span>{{ data.value | formatCurrency('USD') }}</span></a>
+                                </template>
+                                <template #cell(shiftDetail.shiftCount)="data">
+                                    <a href="#" @@click="showShiftModal(data.item.userId)"><span>{{ data.value }}</span></a>
+                                </template>
+                            </b-table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @*Modals All Deposits*@
+        <div class="modal fade" id="modalAllDeposit" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content" v-if="deposits.length">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Deposits</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <b-table striped hover :items="deposits" :fields="fieldsDeposit" table-variant="secondary" head-variant="dark">
+                            <template #cell(depositDate)="data">
+                                <span>{{ data.value |format-date-time }}</span>
+                            </template>
+                            <template #cell(amount)="data">
+                                <span>{{ data.value | formatCurrency('USD') }}</span>
+                            </template>
+                            <template #cell(actions)="data">
+                                <button class="btn btn-sm btn-danger" @@click="deleteDeposit(data.item.id)" title="Delete"><i class="fa fa-trash me-0"></i></button>
+                                <button class="btn btn-sm btn-info" @@click="editDepositData(data.item)" title="Edit"><i class="fa fa-edit"></i></button>
+                            </template>
+                        </b-table>
+                    </div>
+                    <div class="modal-footer">
+                      @*   <button type="button" class="btn btn-primary">Save</button>
+                           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button> *@
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @*Modals All Shifts*@
+        <div class="modal fade" id="modalAllShift" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content" v-if="shifts.length">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Shifts</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-12">
+                                <b-table striped hover :items="shifts" :fields="fieldsShift" table-variant="secondary" head-variant="dark">
+                                    <template #cell(timeIn)="data">
+                                        <span>{{ data.value |format-date-time }}</span>
+                                    </template>
+                                    <template #cell(timeOut)="data">
+                                        <span>{{ data.value |format-date-time }}</span>
+                                    </template>
+                                     <template #cell(hour)="data">
+                                        <span>{{ getHours(data.item.timeIn,data.item.timeOut) }}</span>
+                                    </template>
+                                     <template #cell(minute)="data">
+                                        <span>{{ getMinutes(data.item.timeIn,data.item.timeOut) }}</span>
+                                    </template>
+                                    <template #cell(second)="data">
+                                        <span>{{ getSeconds(data.item.timeIn,data.item.timeOut) }}</span>
+                                    </template>
+                                    <template #cell(actions)="data">
+                                        <button class="btn btn-sm btn-danger" @@click="deleteShift(data.item.id)" title="Delete"><i class="fa fa-trash me-0"></i></button>
+                                        <button class="btn btn-sm btn-info" @@click="editShiftData(data.item)" title="Edit"><i class="fa fa-edit"></i></button>
+                                    </template>
+                                </b-table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        @*   <button type="button" class="btn btn-primary">Save</button>
+                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button> *@
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @*Modals Add/Edit Deposit*@
+        <div class="modal fade" id="modalDeposit" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog ">
+                <div class="modal-content" v-if="editDeposit">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ editDeposit.id === 0 ? 'Add' : 'Edit' }} Deposit</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="frmDeposit" v-form-validation>
+                            <div class="row">
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <select id="selectSalePersons" name="selectSalePersons" class="form-select" v-model="editDeposit.userId" select-required="The Sale Person is required.">
+                                            <option value="0" selected>-- Select Sale Person --</option>
+                                            <option :value="u.id" v-for="u in salesUsers">{{ u.firstName+' '+u.lastName }}</option>
+                                        </select>
+                                        <label for="selectSalePersons">Sale Persons</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 col-12">
+                                    <div class="form-floating mb-3">
+                                        <input type="date" id="depositDate" name="depositDate" class="form-control" v-model="editDeposit.depositDate">
+                                        <label for="depositDate" class="form-label">Deposit Date</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 col-12">
+                                    <div class="form-floating mb-3">
+                                        <input type="time" id="depositTime" name="depositTime" class="form-control" v-model="depositTime">
+                                        <label for="depositTime" class="form-label">Deposit Time</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <input id="txtDepositAmount" name="txtDepositAmount" type="number" class="form-control" placeholder="Sale Amount" v-model="editDeposit.amount" required data-msg-required="The Sale Amount is required." />
+                                        <label for="txtDepositAmount">Sale Amount</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <div class="form-check form-switch" v-if="editDeposit.id">
+                                            <input class="form-check-input" type="checkbox" id="chkActive" v-model="editDeposit.isActive" />
+                                            <label class="form-check-label" for="chkActive">Active</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" @@click="saveDeposit()">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @*Modals Add/Edit Shift*@
+        <div class="modal fade" id="modalShift" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog ">
+                <div class="modal-content" v-if="editShift">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ editShift.id === 0 ? 'Add' : 'Edit' }} Shift</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                         <form id="frmShift" v-form-validation>
+                            <div class="row">
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <select id="selectSalePersons" name="selectSalePersons" class="form-select" v-model="editShift.userId" select-required="The Sale Person is required.">
+                                            <option value="0" selected>-- Select Sale Person --</option>
+                                            <option :value="u.id" v-for="u in salesUsers">{{ u.firstName+' '+u.lastName }}</option>
+                                        </select>
+                                        <label for="selectSalePersons">Sale Persons</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 col-12">
+                                    <div class="form-floating mb-3">
+                                        <input type="date" id="shiftDate" name="shiftDate" class="form-control" v-model="shiftDate">
+                                        <label for="shiftDate" class="form-label">Date</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 col-12">
+                                    <div class="form-floating mb-3">
+                                        <input type="time" id="timeIn" name="timeIn" class="form-control" v-model="editShift.timeIn">
+                                        <label for="timeIn" class="form-label">Time In</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 col-12">
+                                    <div class="form-floating mb-3">
+                                        <input type="time" id="timeOut" name="timeOut" class="form-control" v-model="editShift.timeOut">
+                                        <label for="timeOut" class="form-label">Time Out</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" @@click="saveShift()">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+
+    <script>
+        Vue.config.devtools = true;
+        if (vueAdminDeposit != null) {
+            vueAdminDeposit.$destroy();
+        }
+
+        var vueAdminDeposit = new Vue({
+            el: '#divAdminDeposits',
+            components: {
+                'MultipleSelect': MultipleSelect
+            },
+            data: {
+                shiftdeposits: [],
+                shifts: [],
+                deposits: [],
+                startDate: moment().startOf('month').format('YYYY-MM-DD'),
+                endDate: moment().endOf('month').format('YYYY-MM-DD'),
+                dateFilterTypes: @Html.Raw(Json.Serialize(dateFilterTypes)),
+                dateFilterId: 1,
+                fields: [
+                    {
+                        key: 'userName',
+                        label: 'Name',
+                        sortable: true,
+                    },
+                    {
+                        key: 'shiftDetail.hours',
+                        label: 'Hours',
+                        sortable: true,
+                    },
+                    {
+                        key: 'shiftDetail.minutes',
+                        label: 'Minutes',
+                        sortable: true,
+                    },
+                    {
+                        key: 'shiftDetail.shiftCount',
+                        label: 'Shifts',
+                        sortable: true,
+                    },
+                    {
+                        key: 'depositAmount',
+                        label: 'Deposits',
+                        sortable: true,
+                    },
+                ],
+                fieldsShift: [
+                    {
+                        key: 'userName',
+                        label: 'Name',
+                        sortable: true,
+                    },
+                    {
+                        key: 'timeIn',
+                        label: 'Time In',
+                        sortable: true,
+                    },
+                    {
+                        key: 'timeOut',
+                        label: 'Time Out',
+                        sortable: true,
+                    },
+                    {
+                        key: 'hour',
+                        label: 'Hour',
+                        sortable: true,
+                    },
+                    {
+                        key: 'minute',
+                        label: 'Minute',
+                        sortable: true,
+                    },
+                    {
+                        key: 'second',
+                        label: 'Second',
+                        sortable: true,
+                    },
+                    {
+                        key: 'actions',
+                        label: 'Actions',
+                    },
+                ],
+                fieldsDeposit: [
+                    {
+                        key: 'userName',
+                        label: 'Name',
+                        sortable: true,
+                    },
+                    {
+                        key: 'amount',
+                        label: 'Sale Amount',
+                        sortable: true,
+                    },
+                    {
+                        key: 'depositDate',
+                        label: 'Deposit Date & Time',
+                        sortable: true,
+                    },
+                    {
+                        key: 'actions',
+                        label: 'Actions',
+                    }
+                ],
+                editDeposit: null,
+                users: @Html.Raw(Json.Serialize(Model)),
+                editShift: null,
+                shiftDate: '',
+                depositTime: '',
+            },
+            methods: {
+                showDepositModal(userId) {
+                    this.deposits = [];
+                    this.getDeposits(userId);
+                    showModal('#modalAllDeposit');
+                },
+                showShiftModal(userId) {
+                    this.shifts = [];
+                    this.getShifts(userId);
+                    showModal('#modalAllShift');
+                },
+                getShiftsDeposits() {
+                    if (!moment(this.startDate).isValid() || !moment(this.endDate).isValid()) return;
+                    $.post('/Admin/GetShiftsDeposits', postData({ startDate: this.startDate, endDate: this.endDate }), (data, status, response) => {
+                        if (response.status === 200) {
+                            this.shiftdeposits = data;
+                        }
+                    });
+                },
+                getDeposits(userId) {
+                    $.post('/Admin/GetDepositsByUser', postData({ startDate: this.startDate, endDate: this.endDate, userId: userId }), (data, status, response) => {
+                        if (response.status === 200) {
+                            this.deposits = data;
+                        }
+                    });
+                },
+                getShifts(userId) {
+                    $.post('/Admin/GetShiftsByUser', postData({ startDate: this.startDate, endDate: this.endDate, userId: userId }), (data, status, response) => {
+                        if (response.status === 200) {
+                            this.shifts = data;
+                        }
+                    });
+                },
+                depositFilterChange() {
+
+                    switch (this.dateFilterId) {
+                        case 1:
+                            this.startDate = moment().startOf('month').format('YYYY-MM-DD');
+                            this.endDate = moment().endOf('month').format('YYYY-MM-DD');
+                            break;
+                        case 2:
+                            this.startDate = moment().subtract(1, 'month').startOf('month').format('YYYY-MM-DD');
+                            this.endDate = moment().subtract(1, 'month').endOf('month').format('YYYY-MM-DD');
+                            break;
+                        case 3:
+                            this.startDate = this.startDate;
+                            this.endDate = this.endDate;
+                            break;
+                        default:
+                            this.startDate = null;
+                            this.endDate = null;
+                            return;
+                    }
+
+                    this.getShiftsDeposits();
+                },
+                filterDateChange() {
+                    this.getShiftsDeposits();
+                },
+                addDepositData() {
+                    this.editDeposit = { id: 0,userId:0 };
+                    this.editDeposit.depositDate = moment().format('YYYY-MM-DD');
+                    this.depositTime = moment().format('HH:mm');
+                    showModal('#modalDeposit');
+                },
+                editDepositData(data) {
+                    this.editDeposit = { ...data };
+                    this.editDeposit.depositDate = moment(data.depositDate).format('YYYY-MM-DD');
+                    this.depositTime = moment(data.depositDate).format('HH:mm');
+                    showModal('#modalDeposit');
+                },
+                saveDeposit() {
+                    if ($('#frmDeposit').valid()) {
+                        this.editDeposit.depositDate = moment(`${this.editDeposit.depositDate} ${this.depositTime}`, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD HH:mm:ss');
+                        $.post('/Admin/SaveDeposit', postData({ deposit: this.editDeposit }), (data, status, response) => {
+                            if (response.status === 200) {
+                                let index = this.deposits.findIndex(x => x.id === this.editDeposit.id);
+                                if (index > -1) {
+                                    Vue.set(this.deposits, this.deposits.findIndex(x => x.id === this.editDeposit.id), data);
+                                } else {
+                                    this.deposits.push(data);
+                                }
+                                this.editDeposit = null;
+                                hideModal('#modalDeposit');
+                                notifySuccess("Deposit saved successfully!");
+                            }
+                        });
+                    }
+                },
+                deleteDeposit(depositId) {
+                    confirmBox("You want to delete this Deposit", () => {
+                        $.post('/Admin/DeleteDeposit', postData({ depositId: depositId }), (data, status, response) => {
+                            if (response.status === 200) {
+                                let index = this.deposits.findIndex(x => x.id === depositId);
+                                if (index > -1) {
+                                    this.deposits.splice(index, 1);
+                                }
+                                this.editDeposit = null;
+                                notifySuccess("Deposit deleted successfully!");
+                            }
+                        });
+                    });
+                },
+                addShiftData() {
+                    this.editShift = { id: 0,userId:0 };
+                    showModal('#modalShift');
+                },
+                editShiftData(data) {
+                    this.editShift = { ...data };
+                    this.shiftDate = moment(data.timeIn).format('YYYY-MM-DD');
+                    this.editShift.timeIn = moment(data.timeIn).format('HH:mm');
+                    this.editShift.timeOut = moment(data.timeOut).format('HH:mm');
+                    showModal('#modalShift');
+                },
+                saveShift() {
+                    this.editShift.timeIn = moment(`${this.shiftDate} ${this.editShift.timeIn}`, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD HH:mm:ss');
+                    this.editShift.timeOut = moment(`${this.shiftDate} ${this.editShift.timeOut}`, 'YYYY-MM-DD HH:mm:ss').format('YYYY-MM-DD HH:mm:ss');
+                    $.post('/Admin/SaveShift', postData({ shift: this.editShift }), (data, status, response) => {
+                        if (response.status === 200) {
+                            let index = this.shifts.findIndex(x => x.id === this.editShift.id);
+                            if (index > -1) {
+                                Vue.set(this.shifts, this.shifts.findIndex(x => x.id === this.editShift.id), data);
+                            } else {
+                                this.shifts.push(data);
+                            }
+                            this.editShift = null;
+                            this.shiftDate = '';
+                            hideModal('#modalShift');
+                            notifySuccess("Shift saved successfully!");
+                        }
+                    });
+                },
+                deleteShift(shiftId) {
+                    confirmBox("You want to delete this Shift", () => {
+                        $.post('/Admin/DeleteShift', postData({ shiftId: shiftId }), (data, status, response) => {
+                            if (response.status === 200) {
+                                let index = this.shifts.findIndex(x => x.id === shiftId);
+                                if (index > -1) {
+                                    this.shifts.splice(index, 1);
+                                }
+                                this.editShift = null;
+                                notifySuccess("Shift deleted successfully!");
+                            }
+                        });
+                    });
+                },
+                getHours(timeIn, timeOut) {
+                    const startTime = moment(timeIn);
+                    const endTime = moment(timeOut);
+                    const duration = moment.duration(endTime.diff(startTime));
+                    const hours = duration.hours();
+                    return hours < 0 ? 0 : hours;
+                },
+                getMinutes(timeIn, timeOut) {
+                    const startTime = moment(timeIn);
+                    const endTime = moment(timeOut);
+                    const duration = moment.duration(endTime.diff(startTime));
+                    const minutes= duration.minutes();
+                    return minutes < 0 ? 0 : minutes;
+                },
+                getSeconds(timeIn, timeOut) {
+                    const startTime = moment(timeIn);
+                    const endTime = moment(timeOut);
+                    const duration = moment.duration(endTime.diff(startTime));
+                    const seconds = duration.seconds();
+                    return seconds < 0 ? 0 : seconds;
+                }
+            },
+            computed: {
+                salesUsers() {
+                    return this.users.filter(x => x.roleId ===3);
+                },
+            },
+            mounted() {
+                this.getShiftsDeposits();
+            },
+        });
+
+    </script>
+}

@@ -1,0 +1,286 @@
+﻿@model List<Hatid.Data.Models.User>
+@{
+    ViewData["Title"] = "Deposits";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var dateFilterTypes = Hatid.Helpers.EnumToDataList<Hatid.EnumtDateFilter>();
+}
+<div id="divDeposits" v-cloak>
+    <div class="row">
+        <div class="col-12">
+            <div class="card content-bg">
+                <div class="card-header">
+                   <div class="row">
+                        <div class="col-md-2 col-12">
+                            <div class="form-floating mb-3">
+                                <select id="selectDateFilter" class="form-select" v-model="dateFilterId" @@change="depositFilterChange">
+                                    <option :value="d.key" v-for="d in dateFilterTypes">{{d.value}}</option>
+                                </select>
+                                <label for="selectDateFilter">Date Range</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6" v-if="dateFilterId === 3">
+                            <div class="form-floating mb-3">
+                                <input type="date" id="dateFromCustom" name="dateFromCustom" class="form-control" v-on:blur="filterDateChange" v-model="startDate">
+                                <label for="txtFromdate" class="form-label">From</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6" v-if="dateFilterId === 3">
+                            <div class="form-floating mb-3">
+                                <input type="date" id="dateToCustom" name="dateToCustom" class="form-control" v-on:blur="filterDateChange" v-model="endDate">
+                                <label for="dateToFor" class="form-label">To</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-2 float-start">
+                           @*  <label class="form-label mb-0 text-secondary">Sale Persons</label>
+                            <multiple-select id="ddlUsers" multiple v-model="selectedUserIds" style="width: 100% !important" :data="userList" placeholder="Select Sale Person" :options="filterData"></multiple-select> *@
+                            <div class="form-floating mb-3">
+                                <select id="selectSalePersons" name="selectSalePersons" class="form-select" v-model="selectedUserId">
+                                    <option value="0" selected>-- Select Sale Person --</option>
+                                    <option :value="u.id" v-for="u in users">{{ u.firstName+' '+u.lastName }}</option>
+                                </select>
+                                <label for="selectSalePersons">Sale Persons</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-auto ms-auto mt-2">
+                            <a class="btn btn-primary float-right" href="#" title="Add" @@click="addDepositData"><i class="fa fa-plus"></i></a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <b-table striped hover :items="filteredDeposits" :fields="fields" table-variant="secondary" head-variant="dark">
+                                <template #cell(createdDate)="data">
+                                    <span>{{ data.value |format-date-time}}</span>
+                                </template>
+                                <template #cell(amount)="data">
+                                    <span>{{ data.value | formatCurrency('USD') }}</span>
+                                </template>
+                                <template #cell(isActive)="data">
+                                    <span><i :class="data.value ? 'fa-lg fas fa-check-circle text-success' : 'fa-lg fas fa-times-circle text-danger'"></i></span>
+                                </template>
+                                <template #cell(actions)="data">
+                                    <button class="btn btn-sm btn-danger" @@click="deleteDeposit(data.item.id)" title="Delete"><i class="fa fa-trash me-0"></i></button>
+                                    <button class="btn btn-sm btn-info" @@click="editDepositData(data.item)" title="Edit"><i class="fa fa-edit"></i></button>
+                                </template>
+                            </b-table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @*Modals*@
+        <div class="modal fade" id="modalDeposit" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog ">
+                <div class="modal-content" v-if="editDeposit">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ editDeposit.id === 0 ? 'Add' : 'Edit' }} Deposit</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="frmDeposit" v-form-validation>
+                            <div class="row">
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <select id="selectSalePersons" name="selectSalePersons" class="form-select" v-model="editDeposit.userId" select-required="The Sale Person is required.">
+                                            <option value="0" selected>-- Select Sale Person --</option>
+                                            <option :value="u.id" v-for="u in users">{{ u.firstName+' '+u.lastName }}</option>
+                                        </select>
+                                        <label for="selectSalePersons">Sale Persons</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-12">
+                                    <div class="form-floating mb-3">
+                                        <input id="txtDeposit" name="txtDeposit" type="number" class="form-control" placeholder="Sale Amount" v-model="editDeposit.amount" required data-msg-required="The Sale Amount is required." />
+                                        <label for="txtDeposit">Sale Amount</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-6">
+                                    <div class="form-floating mb-3">
+                                        <div class="form-check form-switch" v-if="editDeposit.id">
+                                            <input class="form-check-input" type="checkbox" id="chkActive" v-model="editDeposit.isActive" />
+                                            <label class="form-check-label" for="chkActive">Active</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" @@click="saveDeposit()">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+
+    <script>
+        Vue.config.devtools = true;
+        if (vueDeposit != null) {
+            vueDeposit.$destroy();
+        }
+
+        var vueDeposit = new Vue({
+            el: '#divDeposits',
+            components: {
+                'MultipleSelect': MultipleSelect
+            },
+            data: {
+                deposits: [],
+                users: @Html.Raw(Json.Serialize(Model)),
+                startDate: moment().startOf('month').format('YYYY-MM-DD'),
+                endDate: moment().endOf('month').format('YYYY-MM-DD'),
+                dateFilterTypes: @Html.Raw(Json.Serialize(dateFilterTypes)),
+                dateFilterId: 1,
+                editDeposit: null,
+                selectedUserIds: [],
+                selectedUserId: 0,
+                fields: [
+                    {
+                        key: 'salePerson',
+                        label: 'Sale Person',
+                        sortable: true,
+                    },
+                    {
+                        key: 'amount',
+                        label: 'Sale Amount',
+                        sortable: true,
+                    },
+                    {
+                        key: 'createdDate',
+                        label: 'Created Date & Time',
+                        sortable: true,
+                    },
+                    {
+                        key: 'isActive',
+                        label: 'Active',
+                        sortable: true,
+                    },
+                    {
+                        key: 'actions',
+                        label: 'Actions',
+                    }
+                ],
+                filterData: {
+                    filter: true,
+                },
+
+            },
+            methods: {
+                selectDefaultFirst() {
+                    if (this.users.length > 0) this.selectedUser(this.users[0]);
+                },
+                selectedUser(u) {
+                    this.selectedUserId = u.id;
+                },
+                addDepositData() {
+                    this.editDeposit = { id: 0,userId:0 };
+                    showModal('#modalDeposit');
+                },
+                editDepositData(data) {
+                    this.editDeposit = { ...data };
+                    showModal('#modalDeposit');
+                },
+                saveDeposit() {
+                    if ($('#frmDeposit').valid()) {
+                        $.post('/Admin/SaveDeposit', postData({ deposit: this.editDeposit }), (data, status, response) => {
+                            if (response.status === 200) {
+                                let index = this.deposits.findIndex(x => x.id === this.editDeposit.id);
+                                if (index > -1) {
+                                    Vue.set(this.deposits, this.deposits.findIndex(x => x.id === this.editDeposit.id), data);
+                                } else {
+                                    this.deposits.push(data);
+                                }
+                                this.editDeposit = null;
+                                this.selectedUserId = data.userId;
+                                hideModal('#modalDeposit');
+                                notifySuccess("Deposit saved successfully!");
+                            }
+                        });
+                    }
+                },
+                deleteDeposit(depositId) {
+                    confirmBox("You want to delete this Deposit", () => {
+                        $.post('/Admin/DeleteDeposit', postData({ depositId: depositId }), (data, status, response) => {
+                            if (response.status === 200) {
+                                let index = this.deposits.findIndex(x => x.id === depositId);
+                                if (index > -1) {
+                                    this.deposits.splice(index, 1);
+                                }
+                                this.editDeposit = null;
+                                notifySuccess("Deposit deleted successfully!");
+                            }
+                        });
+                    });
+                },
+                getDeposits() {
+                    if (!moment(this.startDate).isValid() || !moment(this.endDate).isValid()) return;
+                    $.post('/Admin/GetDeposits', postData({ startDate: this.startDate, endDate: this.endDate }), (data, status, response) => {
+                        if (response.status === 200) {
+                            this.deposits = data;
+                        }
+                    });
+                },
+                depositFilterChange() {
+
+                    switch (this.dateFilterId) {
+                        case 1:
+                            this.startDate = moment().startOf('month').format('YYYY-MM-DD');
+                            this.endDate = moment().endOf('month').format('YYYY-MM-DD');
+                            break;
+                        case 2:
+                            this.startDate = moment().subtract(1, 'month').startOf('month').format('YYYY-MM-DD');
+                            this.endDate = moment().subtract(1, 'month').endOf('month').format('YYYY-MM-DD');
+                            break;
+                        case 3:
+                            this.startDate = this.startDate;
+                            this.endDate = this.endDate;
+                            break;
+                        default:
+                            this.startDate = null;
+                            this.endDate = null;
+                            return;
+                    }
+
+                    this.getDeposits();
+                },
+                filterDateChange() {
+                    this.getDeposits();
+                },
+            },
+            computed: {
+                userList() {
+                    var ret = this.users.sort((a, b) => {
+                        return (a.id > 0 ? ((a.Sort > b.Sort) ? 1 : ((b.Sort > a.Sort) ? -1 : 0)) : 0);
+                    });
+                    return ret.map((x) => {
+                        return { value: x.id, text: x.firstName+' '+x.lastName };
+                    });
+                },
+                filteredDeposits() {
+                    var ret = this.deposits;
+                    // if (this.selectedUserIds.length) {
+                    //     ret = ret.filter(x => this.selectedUserIds.includes(x.userId));
+                    // }
+
+                    if (this.selectedUserId>0) {
+                        ret = ret.filter(x => x.userId == this.selectedUserId);
+                    }
+
+                    return ret;
+                },
+            },
+            mounted() {
+                //this.selectedUserIds = this.userList.map(u => u.value);
+                this.selectDefaultFirst();
+                this.getDeposits();
+            },
+        });
+
+    </script>
+}

@@ -1,0 +1,320 @@
+﻿@{
+    ViewData["Title"] = "My Shifts";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var dateFilterTypes = Hatid.Helpers.EnumToDataList<Hatid.EnumtDateFilter>();
+}
+<div id="divMyShifts" v-cloak>
+    <div class="row">
+        <div class="col-12">
+            <div class="card content-bg">
+                <div class="card-header">
+                    <div class="row">
+                        <div class="col-md-2 col-12">
+                            <div class="form-floating mb-3">
+                                <select id="selectDateFilter" class="form-select" v-model="dateFilterId" @@change="shiftFilterChange">
+                                    <option :value="d.key" v-for="d in dateFilterTypes">{{d.value}}</option>
+                                </select>
+                                <label for="selectDateFilter">Date Range</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6" v-if="dateFilterId === 3">
+                            <div class="form-floating mb-3">
+                                <input type="date" id="dateFromCustom" name="dateFromCustom" class="form-control" v-on:blur="filterDateChange" v-model="startDate">
+                                <label for="txtFromdate" class="form-label">From</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6" v-if="dateFilterId === 3">
+                            <div class="form-floating mb-3">
+                                <input type="date" id="dateToCustom" name="dateToCustom" class="form-control" v-on:blur="filterDateChange" v-model="endDate">
+                                <label for="dateToFor" class="form-label">To</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <b-table striped hover :items="shiftdeposits" :fields="fields" table-variant="secondary" head-variant="dark">
+                                <template #cell(depositAmount)="data">
+                                    <a href="#" @@click="showDepositModal()"><span>{{ data.value | formatCurrency('USD') }}</span></a>
+                                </template>
+                                <template #cell(shiftDetail.shiftCount)="data">
+                                    <a href="#" @@click="showShiftModal()"><span>{{ data.value }}</span></a>
+                                </template>
+                            </b-table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @*Modals All Deposits*@
+        <div class="modal fade" id="modalAllDeposit" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content" v-if="deposits.length">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Deposits</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <b-table striped hover :items="deposits" :fields="fieldsDeposit" table-variant="secondary" head-variant="dark">
+                            <template #cell(depositDate)="data">
+                                <span>{{ data.value |format-date-time }}</span>
+                            </template>
+                            <template #cell(amount)="data">
+                                <span>{{ data.value | formatCurrency('USD') }}</span>
+                            </template>
+                          @*   <template #cell(actions)="data">
+                                <button class="btn btn-sm btn-danger" @@click="deleteDeposit(data.item.id)" title="Delete"><i class="fa fa-trash me-0"></i></button>
+                                <button class="btn btn-sm btn-info" @@click="editDepositData(data.item)" title="Edit"><i class="fa fa-edit"></i></button>
+                            </template> *@
+                        </b-table>
+                    </div>
+                    <div class="modal-footer">
+                        @*   <button type="button" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button> *@
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @*Modals All Shifts*@
+        <div class="modal fade" id="modalAllShift" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content" v-if="shifts.length">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Shifts</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-12">
+                                <b-table striped hover :items="shifts" :fields="fieldsShift" table-variant="secondary" head-variant="dark">
+                                    <template #cell(timeIn)="data">
+                                        <span>{{ data.value |format-date-time }}</span>
+                                    </template>
+                                    <template #cell(timeOut)="data">
+                                        <span>{{ data.value |format-date-time }}</span>
+                                    </template>
+                                    <template #cell(hour)="data">
+                                        <span>{{ getHours(data.item.timeIn,data.item.timeOut) }}</span>
+                                    </template>
+                                    <template #cell(minute)="data">
+                                        <span>{{ getMinutes(data.item.timeIn,data.item.timeOut) }}</span>
+                                    </template>
+                                    <template #cell(second)="data">
+                                        <span>{{ getSeconds(data.item.timeIn,data.item.timeOut) }}</span>
+                                    </template>
+                                  @*   <template #cell(actions)="data">
+                                        <button class="btn btn-sm btn-danger" @@click="deleteShift(data.item.id)" title="Delete"><i class="fa fa-trash me-0"></i></button>
+                                        <button class="btn btn-sm btn-info" @@click="editShiftData(data.item)" title="Edit"><i class="fa fa-edit"></i></button>
+                                    </template> *@
+                                </b-table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        @*   <button type="button" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button> *@
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+
+    <script>
+        Vue.config.devtools = true;
+        if (vueMyShift != null) {
+            vueMyShift.$destroy();
+        }
+
+        var vueMyShift = new Vue({
+            el: '#divMyShifts',
+            data: {
+                shiftdeposits: [],
+                shifts: [],
+                deposits: [],
+                startDate: moment().startOf('month').format('YYYY-MM-DD'),
+                endDate: moment().endOf('month').format('YYYY-MM-DD'),
+                dateFilterTypes: @Html.Raw(Json.Serialize(dateFilterTypes)),
+                dateFilterId: 1,
+                fields: [
+                    {
+                        key: 'userName',
+                        label: 'Name',
+                        sortable: true,
+                    },
+                    {
+                        key: 'shiftDetail.hours',
+                        label: 'Hours',
+                        sortable: true,
+                    },
+                    {
+                        key: 'shiftDetail.minutes',
+                        label: 'Minutes',
+                        sortable: true,
+                    },
+                    {
+                        key: 'shiftDetail.shiftCount',
+                        label: 'Shifts',
+                        sortable: true,
+                    },
+                    {
+                        key: 'depositAmount',
+                        label: 'Deposits',
+                        sortable: true,
+                    },
+                ],
+                fieldsShift: [
+                    {
+                        key: 'userName',
+                        label: 'Name',
+                        sortable: true,
+                    },
+                    {
+                        key: 'timeIn',
+                        label: 'Time In',
+                        sortable: true,
+                    },
+                    {
+                        key: 'timeOut',
+                        label: 'Time Out',
+                        sortable: true,
+                    },
+                    {
+                        key: 'hour',
+                        label: 'Hour',
+                        sortable: true,
+                    },
+                    {
+                        key: 'minute',
+                        label: 'Minute',
+                        sortable: true,
+                    },
+                    {
+                        key: 'second',
+                        label: 'Second',
+                        sortable: true,
+                    },
+                    // {
+                    //     key: 'actions',
+                    //     label: 'Actions',
+                    // },
+                ],
+                fieldsDeposit: [
+                    {
+                        key: 'userName',
+                        label: 'Name',
+                        sortable: true,
+                    },
+                    {
+                        key: 'amount',
+                        label: 'Sale Amount',
+                        sortable: true,
+                    },
+                    {
+                        key: 'depositDate',
+                        label: 'Deposit Date & Time',
+                        sortable: true,
+                    },
+                    // {
+                    //     key: 'actions',
+                    //     label: 'Actions',
+                    // }
+                ],
+
+            },
+            methods: {
+                getShiftsDeposits() {
+                    if (!moment(this.startDate).isValid() || !moment(this.endDate).isValid()) return;
+                    $.post('/Shift/GetShiftsDeposits', postData({ startDate: this.startDate, endDate: this.endDate }), (data, status, response) => {
+                        if (response.status === 200) {
+                            this.shiftdeposits = data;
+                        }
+                    });
+                },
+                shiftFilterChange() {
+
+                    switch (this.dateFilterId) {
+                        case 1:
+                            this.startDate = moment().startOf('month').format('YYYY-MM-DD');
+                            this.endDate = moment().endOf('month').format('YYYY-MM-DD');
+                            break;
+                        case 2:
+                            this.startDate = moment().subtract(1, 'month').startOf('month').format('YYYY-MM-DD');
+                            this.endDate = moment().subtract(1, 'month').endOf('month').format('YYYY-MM-DD');
+                            break;
+                        case 3:
+                            this.startDate = this.startDate;
+                            this.endDate = this.endDate;
+                            break;
+                        default:
+                            this.startDate = null;
+                            this.endDate = null;
+                            return;
+                    }
+
+                    this.getShiftsDeposits();
+                },
+                filterDateChange() {
+                    this.getShiftsDeposits();
+                },
+                getHours(timeIn, timeOut) {
+                    const startTime = moment(timeIn);
+                    const endTime = moment(timeOut);
+                    const duration = moment.duration(endTime.diff(startTime));
+                    const hours = duration.hours();
+                    return hours < 0 ? 0 : hours;
+                },
+                getMinutes(timeIn, timeOut) {
+                    const startTime = moment(timeIn);
+                    const endTime = moment(timeOut);
+                    const duration = moment.duration(endTime.diff(startTime));
+                    const minutes = duration.minutes();
+                    return minutes < 0 ? 0 : minutes;
+                },
+                getSeconds(timeIn, timeOut) {
+                    const startTime = moment(timeIn);
+                    const endTime = moment(timeOut);
+                    const duration = moment.duration(endTime.diff(startTime));
+                    const seconds = duration.seconds();
+                    return seconds < 0 ? 0 : seconds;
+                },
+                showDepositModal() {
+                    this.deposits = [];
+                    this.getDeposits();
+                    showModal('#modalAllDeposit');
+                },
+                showShiftModal() {
+                    this.shifts = [];
+                    this.getShifts();
+                    showModal('#modalAllShift');
+                },
+                getDeposits() {
+                    $.post('/Shift/GetDepositsByUser', postData({ startDate: this.startDate, endDate: this.endDate }), (data, status, response) => {
+                        if (response.status === 200) {
+                            this.deposits = data;
+                        }
+                    });
+                },
+                getShifts() {
+                    $.post('/Shift/GetShiftsByUser', postData({ startDate: this.startDate, endDate: this.endDate }), (data, status, response) => {
+                        if (response.status === 200) {
+                            this.shifts = data;
+                        }
+                    });
+                },
+            },
+            computed: {
+
+            },
+            mounted() {
+                this.getShiftsDeposits();
+            },
+        });
+
+    </script>
+}

@@ -1,0 +1,174 @@
+﻿@model List<Hatid.Data.Models.Shift>
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var shift = new Hatid.Data.Models.Shift();
+}
+<div id="divUserDashboard" v-cloak>
+    <div class="row">
+        <div class="col-12">
+            <div class="card content-bg">
+                <div class="card-header">
+                    <div class="row">
+                        <div class="card-title">Shifts</div>
+                        <div class="col-12">
+                            <button type="button" class="btn btn-primary" @@click="openLoginShiftModal()" :disabled="currentShift !== null">Login</button>
+                            <button type="button" class="btn btn-primary" @@click="openLogoutShiftModal()" :disabled="currentShift === null">Logout</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12">
+                            <b-table striped hover :items="shifts" :fields="fields" table-variant="secondary" head-variant="dark">
+                                <template #cell(timeIn)="data">
+                                    <span>{{ data.value |format-date-time }}</span>
+                                </template>
+                                <template #cell(timeOut)="data">
+                                    <span>{{ data.value |format-date-time }}</span>
+                                </template>
+                                <template #cell(hour)="data">
+                                    <span>{{ getHours(data.item.timeIn,data.item.timeOut) }}</span>
+                                </template>
+                                <template #cell(minute)="data">
+                                    <span>{{ getMinutes(data.item.timeIn,data.item.timeOut) }}</span>
+                                </template>
+                                <template #cell(second)="data">
+                                    <span>{{ getSeconds(data.item.timeIn,data.item.timeOut) }}</span>
+                                </template>
+                            </b-table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @*Modals*@
+        <div class="modal fade" id="modalShift" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+            <div class="modal-dialog ">
+                <div class="modal-content" v-if="editShift">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ editShift.id === 0 ? 'Login' : 'Logout' }} Shift</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        {{confirmationMessage}}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" @@click="saveShift()">Save</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+
+    <script>
+        Vue.config.devtools = true;
+        if (vueUserDashboard != null) {
+            vueUserDashboard.$destroy();
+        }
+
+        var vueUserDashboard = new Vue({
+            el: '#divUserDashboard',
+            data: {
+                shifts: @Html.Raw(Json.Serialize(Model)),
+                shift: @Html.Raw(Json.Serialize(shift)),
+                editShift: null,
+                confirmationMessage:'',
+                fields: [
+                    {
+                        key: 'timeIn',
+                        label: 'Time In',
+                        sortable: true,
+                    },
+                    {
+                        key: 'timeOut',
+                        label: 'Time Out',
+                        sortable: true,
+                    },
+                    {
+                        key: 'hour',
+                        label: 'Hour',
+                        sortable: true,
+                    },
+                    {
+                        key: 'minute',
+                        label: 'Minute',
+                        sortable: true,
+                    },
+                    {
+                        key: 'second',
+                        label: 'Second',
+                        sortable: true,
+                    },
+                ],
+            },
+            methods: {
+                openLoginShiftModal(){
+                    this.editShift = this.shift;
+                    const formattedDate = moment().format('dddd MM/DD/YYYY HH:mm A');
+                    this.confirmationMessage = `Are you sure you want to login shift ${formattedDate}?`;
+                    this.editShift.timeIn = moment().format("YYYY-MM-DD HH:mm:ss");
+                    showModal('#modalShift');
+                },
+                openLogoutShiftModal() {
+                    const formattedDate = moment().format('dddd MM/DD/YYYY HH:mm A');
+                    this.confirmationMessage = `Are you sure you want to logout shift ${formattedDate}?`;
+                    this.editShift = { ...this.currentShift };
+                    this.editShift.timeOut = moment().format("YYYY-MM-DD HH:mm:ss");
+                    showModal('#modalShift');
+                },
+                saveShift() {
+                    $.post('/Shift/SaveShift', postData({ shift: this.editShift }), (data, status, response) => {
+                        if (response.status === 200) {
+                            let index = this.shifts.findIndex(x => x.id === this.editShift.id);
+                            if (index > -1) {
+                                Vue.set(this.shifts, this.shifts.findIndex(x => x.id === this.editShift.id), data);
+                            } else {
+                                this.shifts.push(data);
+                            }
+                            hideModal('#modalShift');
+                            notifySuccess("Shift saved successfully!");
+                        }
+                    });
+                },
+                getHours(timeIn, timeOut) {
+                    const startTime = moment(timeIn);
+                    const endTime = moment(timeOut);
+                    const duration = moment.duration(endTime.diff(startTime));
+                    const hours = duration.hours();
+                    return hours < 0 ? 0 : hours;
+                },
+                getMinutes(timeIn, timeOut) {
+                    const startTime = moment(timeIn);
+                    const endTime = moment(timeOut);
+                    const duration = moment.duration(endTime.diff(startTime));
+                    const minutes = duration.minutes();
+                    return minutes < 0 ? 0 : minutes;
+                },
+                getSeconds(timeIn, timeOut) {
+                    const startTime = moment(timeIn);
+                    const endTime = moment(timeOut);
+                    const duration = moment.duration(endTime.diff(startTime));
+                    const seconds = duration.seconds();
+                    return seconds < 0 ? 0 : seconds;
+                }
+            },
+            computed: {
+                currentShift() {
+                    var shift = this.shifts.find(x => x.isCompleted == false);
+                    return shift !== undefined ? shift : null;
+                },
+            },
+            mounted() {
+               
+            },
+        });
+
+    </script>
+}
